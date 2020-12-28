@@ -20,13 +20,13 @@ GET_TWEET_MAX = 10000
 GET_REPLY_COUNT = 3
 
 # inputファイル
-INPUT_FILE = "/input.txt"
+INPUT_FILE = "./input.txt"
 
 # outputファイル
-OUTPUT_FILE = "/output.txt"
+OUTPUT_FILE = "./output.txt"
 
 # ログ出力先
-LOG_FILE = "/log.log"
+LOG_FILE = "./log.log"
 
 # 削除する文字列(見えない文字はメモ帳とかに張り付ければわかる)
 banWord = ["︎","️","","",""]
