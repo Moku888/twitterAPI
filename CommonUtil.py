@@ -67,9 +67,6 @@ def getIdToFile(fileName):
 
 # データ整形
 def cleanWord(word):
-
-    wakati = MeCab.Tagger("-Owakati")
-
     # 改行削除
     word = re.sub("\n","",word)
     word = re.sub("\r\n","",word)
@@ -82,13 +79,24 @@ def cleanWord(word):
     # リプライ文字列(@Lize等)を削除
     word = re.sub("@.* ","",word)
 
+    # 手間だけど一つずつ処理
+    #===============================
     # 英数字を半角に統一
     word = neologdn.normalize(word)
-
-    # 絵文字削除
-    word = ''.join(['' if c in emoji.UNICODE_EMOJI else c for c in word])
-    # 文字化け絵文字削除（空白に見えるけど化けたのがある）
-    word = re.sub("️","",word)
+    # 記号を半角に変換
+    word = re.sub("？","?",word)
+    word = re.sub("！","!",word)
+    # "～"を"ー"に統一
+    word = re.sub("～","ー",word)
+    # "ー"が2回以上連続で出る場合、1つにする
+    word = re.sub("ー{2,}","ー",word)
+    # "っ"が2回以上連続で出る場合、1つにする
+    word = re.sub("っ{2,}","っ",word)
+    # "!"が2回以上連続で出る場合、1つにする
+    word = re.sub("!{2,}","!",word)
+    # "?"が2回以上連続で出る場合、1つにする
+    word = re.sub("\?{2,}","?",word)
+    #===============================
 
     # かっこ書き削除（顔文字も消える）必要な情報も消えそうだけど妥協
     word = re.sub("\(.*\)","",word) #半角
@@ -100,24 +108,84 @@ def cleanWord(word):
     # 数字をすべて0にする(機械学習には不要のため)
     word = re.sub(r'\d+', '0', word)
 
-    # 半角記号の置換
-    word = re.sub(r'[!-/:-@[-`{-~]', r' ', word)
-
-    # 全角記号の置換 (ここでは0x25A0 - 0x266Fのブロックのみを除去)
-    word = re.sub(u'[■-♯]', ' ', word)
+    # 絵文字削除
+    word = ''.join(['' if c in emoji.UNICODE_EMOJI else c for c in word])
 
     # Constに定義した文字削除
-    word = ''.join(['' if c in Const.banWord else c for c in word])
+    word = ''.join(['' if c in Const.BAN_WORD else c for c in word])
 
     # 先頭、末尾の空白を削除
     word = word.strip()
 
-    # 形態素区切り
-    wakatiList = wakati.parse(word).split()
-    word =" ".join(wakatiList)
+    # おかしな日本語削除 AND 形態素区切り
+    word = mecabFunc(word)
 
     return word
 
+# mecabを使っておかしな日本語を削除し、空白区切りにして返す
+def mecabFunc(word):
+    # 整形済み文字列をいれる変数
+    afterWord = ""
+
+    wakati = MeCab.Tagger()
+    # 形態素解析したデータ
+    node=wakati.parseToNode(word)
+
+    while node :
+        # 正しい単語フラグ
+        japFlg = True
+        # 元単語
+        origin = str(node.surface)
+
+        # 残しておきたい記号の場合
+        if origin in Const.SAVE_WORD_LIST:
+            #スペース区切りで結合
+            afterWord = wordJoin(afterWord,origin,Const.JOIN_STR)
+            node=node.next
+            continue
+
+        # リスト型にキャスト
+        # [0:品詞,1:品詞細分類1,2:品詞細分類2,3:品詞細分類3,4:活用型,5:活用形,6:原形,7:読み,8:発音]
+        nodeList = node.feature.split(",")
+
+        # [細分類1:数]はリストが6までしかないので先に処理
+        if japFlg and nodeList[1] == "数":
+            #スペース区切りで結合
+            afterWord = wordJoin(afterWord,origin,Const.JOIN_STR)
+            node=node.next
+            continue
+
+        # BOS/EOS は削除
+        if japFlg and nodeList[0] == "BOS/EOS":
+            japFlg = False
+
+        # 数字以外で何故か6までしかない単語の削除(絵文字とか)
+        if japFlg and len(nodeList) < 9:
+            japFlg = False
+
+        # 品詞=記号の場合削除
+        if japFlg and nodeList[0] == "記号":
+            japFlg = False
+
+        # 名詞　且つ　読みがない場合削除
+        if japFlg and nodeList[0] == "名詞" and nodeList[7] == "*":
+            japFlg = False
+
+        if japFlg:
+            #スペース区切りで結合
+            afterWord = wordJoin(afterWord,origin,Const.JOIN_STR)
+
+        node=node.next
+    return afterWord
+
+# 文字列をjoinWordで結合
+def wordJoin(fromWord, toWord, joinWord):
+    reWord = ""
+    if not fromWord:
+        reWord = toWord
+    else:
+        reWord = fromWord + joinWord + toWord
+    return reWord
 
 # ログ設定
 def setLoggerCon():

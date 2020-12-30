@@ -1,5 +1,3 @@
-
-# tweeterAPI
 import tweepy, Const
 import CommonUtil as cu
 import os
@@ -17,11 +15,17 @@ class GetTweet:
         auth.set_access_token(access_token, access_token_secret)
 
         self.api = tweepy.API(auth, wait_on_rate_limit=True)
+        self.word = ""
         self.maxId = "0"
 
 
     # 検索ワードで検索する。APIの制限で一度に取得できるのは100ツイートまで。
     def searchWord(self, word):
+        # 検索ワードが変わった場合はmaxIdをリセット
+        if word != self.word:
+            self.maxId = "0"
+
+        self.word = word
         # 検索開始
         result = self.api.search(q=word, count=100, max_id=self.maxId)
         self.maxId = result[len(result)-1].id_str
@@ -35,7 +39,6 @@ class GetTweet:
         result = self.api.statuses_lookup(id_=statusId)
         # リストで返却
         return list(result)
-
 
 # リプライIDがあるデータのみ取得
 # リプが多すぎると困るので元IDが同じものはnum数だけ取得
@@ -126,7 +129,7 @@ def fileWrite(peirList):
     with open(Const.OUTPUT_FILE, encoding=Const.fileEncod, mode=fileMode) as outputF:
         outputF.write(outputWords)
 
-# modelList内に同じリプ元IDがいくつあるか検索
+# idList内に同じリプ元IDがいくつあるか検索
 def countRepId(idList, repId):
     count = 0
     for data in idList:
